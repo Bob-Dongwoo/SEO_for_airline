@@ -1,0 +1,106 @@
+#Importing necessary packages
+library(readxl)
+library(dplyr)
+library(ggplot2)
+
+#Reading the necessary file - search engine data
+airfrance <- as.data.frame(read_excel("Air France.xls", sheet = "DoubleClick"))
+
+#Dropping the unnecessary columns
+airfrance <- select(airfrance, -c('Keyword ID', 'Keyword Type'))
+
+#Reading the Kayak data
+kayak <- read_excel("Air France.xls", sheet = "Kayak")
+
+#Simplifying the column names, deleting spaces
+colnames(airfrance) <- c("publisher_id", "publisher", "keyword", "match", "campaign", "keyword_group", "category", "strategy", 
+                         "status", "bid", "clicks", "click_charge", "cost_per_click", "impressions", "click_thru", "avg_pos", 
+                         "conversion", "cost_conversion", "amount", "cost", "bookings")
+
+# Drop match with N/A values, unable to interpret
+airfrance <- airfrance[!airfrance$match=="N/A",]
+
+# Create column success, Sales keyword -> 1 , no sales keyword -> 0
+airfrance$success <- c()
+for (row in 1:nrow(airfrance)) {
+  if (airfrance$bookings[row] == 0) {airfrance$success[row] <- 0}
+  else {airfrance$success[row] <- 1}
+}
+
+#Create column keyword_length for length of keywords 
+airfrance$keyword_length<-nchar(airfrance$keyword)
+
+#Summarize the dataframe by publisher name with impression, clicks, bookings, cost, amount(revenue), number of keywords
+publisher <- airfrance %>%
+  group_by(publisher) %>% 
+  summarise(impressions = sum(impressions), 
+            clicks = sum(clicks), 
+            bookings = sum(bookings), 
+            cost = sum(cost), 
+            amount = sum(amount), 
+            keyword_count = length(keyword))
+
+# Add kayak dataframe to the publisher data frame
+kayak_vector = c("publisher" = kayak[3,1], 
+                 "impression" = as.numeric(NA),  
+                 "clicks" = as.numeric(kayak[3,2]), 
+                 "bookings" = as.numeric(kayak[3,4]), 
+                 "cost" = round(as.numeric(kayak[3,3],2)), 
+                 "amount" = round(as.numeric(kayak[3, 6]), 2))
+kayak_df = data.frame(kayak_vector)
+publisher <- add_row(publisher, 
+                     "publisher" = kayak_df[1,1], 
+                     "impressions" = kayak_df[1,2], 
+                     "clicks" = kayak_df[1,3], 
+                     "bookings" = kayak_df[1,4], 
+                     "cost" = kayak_df[1,5], 
+                     "amount" = kayak_df[1,6])
+
+# Publisher2 <- adding the Total row to the publisher data frame
+publisher2 <- add_row(publisher, "publisher" = "Total")
+for (col in 2:ncol(publisher2)) {
+  publisher2[nrow(publisher2), col] <- sum(publisher2[, col], na.rm = TRUE)
+}
+
+# Publisher dataframe adding necessary columns
+# margin column = amount - cost to get net revenue
+publisher$margin <- c()
+for (row in 1:nrow(publisher)) {
+  publisher$margin[row]<- round(publisher$amount[row] - publisher$cost[row], 2)
+}
+
+# return_rate column = amount / cost to get $ return on every dollar spent for each publisher
+publisher$return_rate <- c()
+for (row in 1:nrow(publisher)) {
+  publisher$return_rate[row]<- round((publisher$amount[row] / publisher$cost[row]), 2)
+}
+
+# cost_impressions column = cost/ impressions cost per impression
+publisher$cost_impressions <- c()
+for (row in 1:nrow(publisher)) {
+  publisher$cost_impressions[row]<- round(publisher$cost[row] / publisher$impressions[row], 2)
+}
+
+# cost_clicks column = cost / clicks cost per clicks 
+publisher$cost_clicks <- c()
+for (row in 1:nrow(publisher)) {
+  publisher$cost_clicks[row]<- round(publisher$cost[row] / publisher$clicks[row], 2)
+}
+
+# cost_bookings column = cost / bookings cost per bookings
+publisher$cost_bookings <- c()
+for (row in 1:nrow(publisher)) {
+  publisher$cost_bookings[row]<- round(publisher$cost[row] / publisher$bookings[row], 2)
+}
+
+# clicks_bookings column = clicks / bookings clicks per bookings
+publisher$clicks_bookings <- c()
+for (row in 1:nrow(publisher)) {
+  publisher$clicks_bookings[row]<- round(publisher$clicks[row] / publisher$bookings[row], 2)
+}
+
+# conversion_rate column = bookings / clicks clicks to booking conversion rate
+publisher$conversion_rate <- c()
+for (row in 1:nrow(publisher)) {
+  publisher$conversion_rate[row]<- round(publisher$bookings[row] / publisher$clicks[row], 3) *100
+}
