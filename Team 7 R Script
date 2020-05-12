@@ -114,12 +114,31 @@ for (row in 1:nrow(airfrance)) {
 # Subset the dataframe qby the unsuccessful keywords
 unsuccess <- airfrance[airfrance$success == 0,]
 
-# Obtain the distribution of the unsuccessful keywords with the clicks per impression rate make a cut-off line at 25% for high potential keywords
+# Obtain the distribution of the unsuccessful keywords with the clicks per impression rate 
+# make a cut-off line at 25% for high potential keywords
 ggplot(unsuccess, aes(click_impression)) + 
-geom_histogram(binwidth = 0.03) + 
-ggtitle("Distribution of unsuccessful keywords") + 
-xlab("Impression to click conversion rate") +
-ylab("Number of keywords") +
-theme(plot.title = element_text(hjust = 0.5)) + 
-xlim(0,1) + 
-geom_vline(xintercept = 0.25, linetype = "dotted", color= "blue", size = 1.5)
+  geom_histogram(binwidth = 0.03) + 
+  ggtitle("Distribution of unsuccessful keywords") + 
+  xlab("Impression to click conversion rate") + 
+  ylab("Number of keywords") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  xlim(0,1) + 
+  geom_vline(xintercept = 0.25, linetype = "dotted", color= "blue", size = 1.5)
+
+# Summarize the unsuccess dataframe by publisher
+unsuccess_publisher <- unsuccess %>%
+  group_by(publisher) %>%
+  summarise(impressions = sum(impressions), clicks = sum(clicks), cost = sum(cost), keyword_count = length(keyword))
+  
+# Add a total column in the unsuccess_publisher dataframe
+unsuccess_publisher <- add_row(unsuccess_publisher, "publisher" = "Total")
+for (col in 2:ncol(unsuccess_publisher)) {
+  unsuccess_publisher[nrow(unsuccess_publisher), col] <- sum(unsuccess_publisher[, col], na.rm = TRUE)
+}
+
+# subset the dataframe with unsuccessful keywords with cut off at 25%
+unsuccess_high <- unsuccess[unsuccess$click_impression >= 0.25,]
+unsuccess_high_publisher <- unsuccess_high %>%
+  group_by(publisher) %>%
+  summarise(impressions = sum(impressions), clicks = sum(clicks), cost = sum(cost), keyword_count = length(keyword))
+  
